@@ -15,9 +15,22 @@
       try self.init(with: NetworkMonitor())
     }
 
-    public init(with monitor: NetworkMonitorProtocol, info: CTTelephonyNetworkInfo = CTTelephonyNetworkInfo()) {
+    public init(with monitor: NetworkMonitorProtocol, info: CTTelephonyNetworkInfo? = nil) {
       networkMonitor = monitor
-      networkInfo = info
+      // CTTelephonyNetworkInfo should be initialized on the main thread.
+      // This initializer may be called from background queues (e.g. MetricKit),
+      // so we hop to the main queue synchronously here.
+      if let info = info {
+        networkInfo = info
+      } else {
+        if Thread.isMainThread {
+          networkInfo = CTTelephonyNetworkInfo()
+        } else {
+          networkInfo = DispatchQueue.main.sync {
+            CTTelephonyNetworkInfo()
+          }
+        }
+      }
     }
 
     public func status() -> (String, String?, CTCarrier?) {
